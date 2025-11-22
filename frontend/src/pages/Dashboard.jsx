@@ -11,6 +11,8 @@ import DeliveryDashboard from "../components/pages/DeliveryDashboard"
 import WarehouseSettings from "../components/pages/WarehouseSettings"
 import LocationSettings from "../components/pages/LocationSettings"
 import Profile from "../components/pages/Profile"
+import InvoiceDashboard from "../components/pages/InvoiceDashboard"
+import InvoiceDetail from "../components/pages/InvoiceDetail"
 
 export default function Dashboard({ currentPage, setCurrentPage, userInfo, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -23,6 +25,10 @@ export default function Dashboard({ currentPage, setCurrentPage, userInfo, onLog
       const receiptId = currentPage.replace("receipt-edit-", "")
       return <ReceiptForm setCurrentPage={setCurrentPage} receiptId={receiptId} />
     }
+    if (currentPage.startsWith("invoice-detail-")) {
+      const invoiceId = currentPage.replace("invoice-detail-", "")
+      return <InvoiceDetail setCurrentPage={setCurrentPage} invoiceId={invoiceId} />
+    }
 
     switch (currentPage) {
       case "dashboard":
@@ -33,6 +39,8 @@ export default function Dashboard({ currentPage, setCurrentPage, userInfo, onLog
         return <MoveHistory />
       case "receipts":
         return <ReceiptsDashboard setCurrentPage={setCurrentPage} />
+      case "invoices":
+        return <InvoiceDashboard setCurrentPage={setCurrentPage} />
       case "delivery":
         return <DeliveryDashboard setCurrentPage={setCurrentPage} />
       case "warehouse":

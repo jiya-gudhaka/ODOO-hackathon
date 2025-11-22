@@ -2,6 +2,10 @@ import express from "express"
 import cors from "cors"
 import pg from "pg"
 import dotenv from "dotenv"
+import multer from "multer"
+import path from "path"
+import fs from "fs"
+import { spawn } from "child_process"
 
 dotenv.config()
 
@@ -10,6 +14,28 @@ const app = express()
 // Middleware
 app.use(cors())
 app.use(express.json())
+
+const storageRoot = path.join(process.cwd(), "backend", "storage")
+const invoicesDir = path.join(storageRoot, "invoices")
+fs.mkdirSync(invoicesDir, { recursive: true })
+app.use("/storage", express.static(storageRoot))
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, invoicesDir),
+  filename: (req, file, cb) => {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, "_")
+    const stamp = Date.now()
+    cb(null, `${stamp}_${safeName}`)
+  },
+})
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ["application/pdf", "image/jpeg", "image/png"]
+    cb(null, allowed.includes(file.mimetype))
+  },
+})
 
 // Database connection
 const { Pool } = pg
@@ -32,6 +58,113 @@ pool.query("SELECT NOW()", (err, res) => {
     console.log("Database connected successfully:", res.rows[0].now)
   }
 })
+
+// Initialize schema (idempotent)
+async function initSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        name TEXT,
+        sku TEXT UNIQUE,
+        category TEXT,
+        unitofmeasure TEXT,
+        initialstock INTEGER DEFAULT 0,
+        unitprice NUMERIC DEFAULT 0,
+        createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updatedat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `)
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id SERIAL PRIMARY KEY,
+        status TEXT,
+        fileurl TEXT,
+        invoicenumber TEXT,
+        supplier TEXT,
+        date DATE,
+        totalamount NUMERIC,
+        createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updatedat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `)
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS invoiceitems (
+        id SERIAL PRIMARY KEY,
+        invoiceid INTEGER REFERENCES invoices(id) ON DELETE CASCADE,
+        productid INTEGER,
+        productname TEXT,
+        sku TEXT,
+        quantity INTEGER DEFAULT 0,
+        unitprice NUMERIC,
+        total NUMERIC
+      );
+    `)
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS receipts (
+        id SERIAL PRIMARY KEY,
+        reference TEXT,
+        supplierid INTEGER,
+        warehouseid INTEGER,
+        status TEXT,
+        createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updatedat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `)
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS receiptitems (
+        id SERIAL PRIMARY KEY,
+        receiptid INTEGER REFERENCES receipts(id) ON DELETE CASCADE,
+        productid INTEGER,
+        quantityreceived INTEGER DEFAULT 0
+      );
+    `)
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS deliveries (
+        id SERIAL PRIMARY KEY,
+        reference TEXT,
+        fromwarehouse INTEGER,
+        towarehouse INTEGER,
+        status TEXT,
+        createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `)
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stockledger (
+        id SERIAL PRIMARY KEY,
+        productid INTEGER,
+        locationid INTEGER,
+        quantitychange INTEGER,
+        type TEXT,
+        referenceid INTEGER,
+        notes TEXT,
+        createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `)
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stockadjustments (
+        id SERIAL PRIMARY KEY,
+        productid INTEGER,
+        locationid INTEGER,
+        countedquantity INTEGER,
+        reason TEXT,
+        createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `)
+    console.log("Schema initialized")
+  } catch (schemaErr) {
+    console.error("Schema initialization error:", schemaErr)
+  }
+}
+
+initSchema()
 
 // Routes
 
@@ -236,6 +369,193 @@ app.put("/api/receipts/:id/complete", async (req, res) => {
     res.json({ success: true, message: "Receipt completed successfully" })
   } catch (err) {
     await pool.query("ROLLBACK")
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// Invoice Routes
+app.get("/api/invoices", async (req, res) => {
+  try {
+    const r = await pool.query("SELECT * FROM invoices ORDER BY createdat DESC")
+    res.json(r.rows)
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+app.get("/api/invoices/:id", async (req, res) => {
+  try {
+    const { id } = req.params
+    const inv = await pool.query("SELECT * FROM invoices WHERE id = $1", [id])
+    if (inv.rows.length === 0) return res.status(404).json({ error: "Invoice not found" })
+    const items = await pool.query(
+      `SELECT ii.*, p.name AS productNameCanonical, p.sku AS skuCanonical
+       FROM invoiceItems ii
+       LEFT JOIN products p ON ii.productId = p.id
+       WHERE ii.invoiceId = $1`,
+      [id],
+    )
+    const invoice = inv.rows[0]
+    invoice.items = items.rows
+    res.json(invoice)
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+app.post("/api/invoices/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file provided" })
+    const fileUrl = `/storage/invoices/${req.file.filename}`
+    const r = await pool.query(
+      `INSERT INTO invoices (status, fileUrl) VALUES ($1, $2) RETURNING *`,
+      ["Uploaded", fileUrl],
+    )
+    res.json(r.rows[0])
+  } catch (err) {
+    res.status(400).json({ error: err.message })
+  }
+})
+
+app.post("/api/invoices/:id/extract", async (req, res) => {
+  const { id } = req.params
+  try {
+    const invRes = await pool.query("SELECT * FROM invoices WHERE id = $1", [id])
+    if (invRes.rows.length === 0) return res.status(404).json({ error: "Invoice not found" })
+    const inv = invRes.rows[0]
+
+    const normalizeDate = (s) => {
+      if (!s) return null
+      const m = s.match(/^([0-9]{1,2})[\/\-]([0-9]{1,2})[\/\-]([0-9]{2,4})$/)
+      if (m) {
+        const y = m[3].length === 2 ? `20${m[3]}` : m[3]
+        return `${y}-${String(m[2]).padStart(2, "0")}-${String(m[1]).padStart(2, "0")}`
+      }
+      const d = new Date(s)
+      return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
+    }
+
+    const mapFromOcr = (ocr) => ({
+      invoiceNumber: ocr["Invoice Number"] || null,
+      supplier: ocr["Vendor Name"] || null,
+      date: normalizeDate(ocr["Invoice Date"]) || null,
+      totalAmount: ocr["Total Amount"] ? Number(ocr["Total Amount"]) : null,
+      items: Array.isArray(ocr["Items"]) ? ocr["Items"].map((x) => ({
+        productName: x["Item Name"] || null,
+        sku: x["HSN/SAC Code"] || null,
+        quantity: x["Quantity"] ? Number(String(x["Quantity"]).replace(/,/g, "")) : 0,
+        unitPrice: x["Unit Price"] ? Number(String(x["Unit Price"]).replace(/,/g, "")) : null,
+        total: x["Line Total"] ? Number(String(x["Line Total"]).replace(/,/g, "")) : null,
+      })) : [],
+    })
+
+    let payload = req.body?.data
+    if (!payload) {
+      if (!inv.fileurl) return res.status(400).json({ error: "No fileUrl stored for invoice" })
+      const filename = path.basename(inv.fileurl)
+      const filePath = path.join(path.join(process.cwd(), "backend", "storage"), "invoices", filename)
+      const pythonBin = process.env.PYTHON_BIN || "python"
+      const scriptPath = process.env.OCR_SCRIPT_PATH || path.join(process.cwd(), "ocr", "extract_invoice.py")
+      const proc = spawn(pythonBin, [scriptPath, filePath])
+      let out = ""
+      let errStr = ""
+      await new Promise((resolve, reject) => {
+        proc.stdout.on("data", (d) => (out += d.toString()))
+        proc.stderr.on("data", (d) => (errStr += d.toString()))
+        proc.on("close", (code) => (code === 0 ? resolve() : reject(new Error(errStr || `Python exit ${code}`))))
+      })
+      const ocr = JSON.parse(out)
+      payload = mapFromOcr(ocr)
+    }
+
+    await pool.query("BEGIN")
+    await pool.query(
+      `UPDATE invoices SET invoiceNumber = $1, supplier = $2, date = $3, totalAmount = $4, status = $5 WHERE id = $6`,
+      [payload.invoiceNumber || null, payload.supplier || null, payload.date || null, payload.totalAmount || null, "Extracted", id],
+    )
+
+    await pool.query("DELETE FROM invoiceItems WHERE invoiceId = $1", [id])
+    for (const it of payload.items || []) {
+      let productId = null
+      if (it.sku) {
+        const p = await pool.query("SELECT id FROM products WHERE sku = $1", [it.sku])
+        if (p.rows[0]) productId = p.rows[0].id
+      }
+      if (!productId && it.productName) {
+        const p = await pool.query("SELECT id FROM products WHERE LOWER(name) = LOWER($1) LIMIT 1", [it.productName])
+        if (p.rows[0]) productId = p.rows[0].id
+      }
+      await pool.query(
+        `INSERT INTO invoiceItems (invoiceId, productId, productName, sku, quantity, unitPrice, total)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [id, productId, it.productName || null, it.sku || null, it.quantity || 0, it.unitPrice || null, it.total || null],
+      )
+    }
+    await pool.query("COMMIT")
+
+    const refreshed = await pool.query("SELECT * FROM invoices WHERE id = $1", [id])
+    res.json(refreshed.rows[0])
+  } catch (err) {
+    await pool.query("ROLLBACK")
+    res.status(400).json({ error: err.message })
+  }
+})
+
+app.put("/api/invoices/:id", async (req, res) => {
+  const { id } = req.params
+  const { invoiceNumber, supplier, date, totalAmount, status, items } = req.body
+  try {
+    await pool.query("BEGIN")
+    const up = await pool.query(
+      `UPDATE invoices SET invoiceNumber = $1, supplier = $2, date = $3, totalAmount = $4, status = $5 WHERE id = $6 RETURNING *`,
+      [invoiceNumber || null, supplier || null, date || null, totalAmount || null, status || "Extracted", id],
+    )
+    await pool.query("DELETE FROM invoiceItems WHERE invoiceId = $1", [id])
+    if (Array.isArray(items)) {
+      for (const it of items) {
+        await pool.query(
+          `INSERT INTO invoiceItems (invoiceId, productId, productName, sku, quantity, unitPrice, total)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [id, it.productId || null, it.productName || null, it.sku || null, it.quantity || 0, it.unitPrice || null, it.total || null],
+        )
+      }
+    }
+    await pool.query("COMMIT")
+    res.json(up.rows[0])
+  } catch (err) {
+    await pool.query("ROLLBACK")
+    res.status(400).json({ error: err.message })
+  }
+})
+
+app.post("/api/invoices/:id/create-receipt", async (req, res) => {
+  const { id } = req.params
+  const { warehouseId, status } = req.body
+  if (!warehouseId) return res.status(400).json({ error: "warehouseId is required" })
+  try {
+    const items = await pool.query("SELECT * FROM invoiceItems WHERE invoiceId = $1", [id])
+    const unmapped = items.rows.filter((r) => !r.productid)
+    if (unmapped.length > 0) {
+      return res.status(422).json({ error: "Unmapped items exist", unmapped })
+    }
+    const countR = await pool.query("SELECT COUNT(*) FROM receipts")
+    const count = Number.parseInt(countR.rows[0].count) + 1
+    const reference = `WH/IN/${String(count).padStart(4, "0")}`
+
+    const rec = await pool.query(
+      `INSERT INTO receipts (reference, warehouseId, status) VALUES ($1, $2, $3) RETURNING *`,
+      [reference, warehouseId, status || "Draft"],
+    )
+    const receiptId = rec.rows[0].id
+
+    for (const it of items.rows) {
+      await pool.query(
+        `INSERT INTO receiptItems (receiptId, productId, quantityReceived) VALUES ($1, $2, $3)`,
+        [receiptId, it.productid, it.quantity],
+      )
+    }
+    res.json({ success: true, receipt: rec.rows[0] })
+  } catch (err) {
     res.status(400).json({ error: err.message })
   }
 })
