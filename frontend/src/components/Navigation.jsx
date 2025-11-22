@@ -14,6 +14,7 @@ import {
   FiMapPin,
   FiLogOut,
   FiChevronDown,
+  FiFileText,
 } from "react-icons/fi"
 import { MdWarehouse } from "react-icons/md"
 
@@ -24,6 +25,7 @@ export default function Navigation({ currentPage, setCurrentPage, userInfo, onLo
     { id: "dashboard", label: "Dashboard", icon: FiHome },
     { id: "stock", label: "Stock", icon: FiPackage },
     { id: "receipts", label: "Receipts", icon: FiDownload },
+    { id: "invoices", label: "Invoices", icon: FiFileText },
     { id: "delivery", label: "Delivery", icon: FiUpload },
     { id: "move-history", label: "Move History", icon: FiClock },
     { id: "settings", label: "Settings", icon: FiSettings, submenu: true },

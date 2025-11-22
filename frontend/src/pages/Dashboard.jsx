@@ -17,6 +17,8 @@ import NotificationsPanel from "../components/NotificationsPanel"
 import TransferForm from "../components/pages/TransferForm"
 import StockAdjustment from "../components/pages/StockAdjustment"
 import ProductManagement from "../components/pages/ProductManagement"
+import InvoiceDashboard from "../components/pages/InvoiceDashboard"
+import InvoiceDetail from "../components/pages/InvoiceDetail"
 
 export default function Dashboard({ userInfo, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -24,6 +26,41 @@ export default function Dashboard({ userInfo, onLogout }) {
 
   const setCurrentPage = (page) => {
     navigate(`/dashboard/${page}`)
+  const renderPage = () => {
+    if (currentPage === "receipt-create") {
+      return <ReceiptForm setCurrentPage={setCurrentPage} />
+    }
+    if (currentPage.startsWith("receipt-edit-")) {
+      const receiptId = currentPage.replace("receipt-edit-", "")
+      return <ReceiptForm setCurrentPage={setCurrentPage} receiptId={receiptId} />
+    }
+    if (currentPage.startsWith("invoice-detail-")) {
+      const invoiceId = currentPage.replace("invoice-detail-", "")
+      return <InvoiceDetail setCurrentPage={setCurrentPage} invoiceId={invoiceId} />
+    }
+
+    switch (currentPage) {
+      case "dashboard":
+        return <DashboardHome setCurrentPage={setCurrentPage} />
+      case "stock":
+        return <StockPage />
+      case "move-history":
+        return <MoveHistory />
+      case "receipts":
+        return <ReceiptsDashboard setCurrentPage={setCurrentPage} />
+      case "invoices":
+        return <InvoiceDashboard setCurrentPage={setCurrentPage} />
+      case "delivery":
+        return <DeliveryDashboard setCurrentPage={setCurrentPage} />
+      case "warehouse":
+        return <WarehouseSettings />
+      case "location":
+        return <LocationSettings setCurrentPage={setCurrentPage} />
+      case "profile":
+        return <Profile userInfo={userInfo} onLogout={onLogout} />
+      default:
+        return <DashboardHome setCurrentPage={setCurrentPage} />
+    }
   }
 
   return (
