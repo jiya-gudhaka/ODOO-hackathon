@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { Routes, Route, useNavigate } from "react-router-dom"
 import Navigation from "../components/Navigation"
 import DashboardHome from "../components/pages/DashboardHome"
 import StockPage from "../components/pages/StockPage"
@@ -11,51 +12,29 @@ import DeliveryDashboard from "../components/pages/DeliveryDashboard"
 import WarehouseSettings from "../components/pages/WarehouseSettings"
 import LocationSettings from "../components/pages/LocationSettings"
 import Profile from "../components/pages/Profile"
+import BarcodeScanner from "../components/BarcodeScanner"
+import NotificationsPanel from "../components/NotificationsPanel"
+import TransferForm from "../components/pages/TransferForm"
+import StockAdjustment from "../components/pages/StockAdjustment"
+import ProductManagement from "../components/pages/ProductManagement"
 
-export default function Dashboard({ currentPage, setCurrentPage, userInfo, onLogout }) {
+export default function Dashboard({ userInfo, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const navigate = useNavigate()
 
-  const renderPage = () => {
-    if (currentPage === "receipt-create") {
-      return <ReceiptForm setCurrentPage={setCurrentPage} />
-    }
-    if (currentPage.startsWith("receipt-edit-")) {
-      const receiptId = currentPage.replace("receipt-edit-", "")
-      return <ReceiptForm setCurrentPage={setCurrentPage} receiptId={receiptId} />
-    }
-
-    switch (currentPage) {
-      case "dashboard":
-        return <DashboardHome setCurrentPage={setCurrentPage} />
-      case "stock":
-        return <StockPage />
-      case "move-history":
-        return <MoveHistory />
-      case "receipts":
-        return <ReceiptsDashboard setCurrentPage={setCurrentPage} />
-      case "delivery":
-        return <DeliveryDashboard setCurrentPage={setCurrentPage} />
-      case "warehouse":
-        return <WarehouseSettings />
-      case "location":
-        return <LocationSettings setCurrentPage={setCurrentPage} />
-      case "profile":
-        return <Profile userInfo={userInfo} onLogout={onLogout} />
-      default:
-        return <DashboardHome setCurrentPage={setCurrentPage} />
-    }
+  const setCurrentPage = (page) => {
+    navigate(`/dashboard/${page}`)
   }
 
   return (
     <div className="flex h-screen bg-grey-50">
       {/* Sidebar Navigation */}
       <Navigation
-        currentPage={currentPage}
-        setCurrentPage={setCurrentPage}
         userInfo={userInfo}
         onLogout={onLogout}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
+        navigate={navigate}
       />
 
       {/* Main Content */}
@@ -63,7 +42,25 @@ export default function Dashboard({ currentPage, setCurrentPage, userInfo, onLog
         className={`flex-1 overflow-auto pt-16 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-20"}`}
         style={{ backgroundColor: "#F9FAFB" }}
       >
-        <div className="p-6">{renderPage()}</div>
+        <div className="p-6">
+          <Routes>
+            <Route path="/" element={<DashboardHome setCurrentPage={setCurrentPage} />} />
+            <Route path="/stock" element={<StockPage />} />
+            <Route path="/products" element={<ProductManagement />} />
+            <Route path="/move-history" element={<MoveHistory />} />
+            <Route path="/receipts" element={<ReceiptsDashboard setCurrentPage={setCurrentPage} />} />
+            <Route path="/receipt-create" element={<ReceiptForm setCurrentPage={setCurrentPage} />} />
+            <Route path="/receipt-edit/:id" element={<ReceiptForm setCurrentPage={setCurrentPage} />} />
+            <Route path="/delivery" element={<DeliveryDashboard setCurrentPage={setCurrentPage} />} />
+            <Route path="/warehouse" element={<WarehouseSettings />} />
+            <Route path="/location" element={<LocationSettings setCurrentPage={setCurrentPage} />} />
+            <Route path="/profile" element={<Profile userInfo={userInfo} onLogout={onLogout} />} />
+            <Route path="/scanner" element={<BarcodeScanner warehouseId={null} />} />
+            <Route path="/notifications" element={<NotificationsPanel />} />
+            <Route path="/transfers" element={<TransferForm />} />
+            <Route path="/adjustments" element={<StockAdjustment />} />
+          </Routes>
+        </div>
       </div>
     </div>
   )

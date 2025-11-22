@@ -1,129 +1,289 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { FiSearch, FiList, FiGrid, FiTrendingUp, FiTrendingDown, FiRepeat } from "react-icons/fi"
+import { useSocket } from "../../context/SocketContext"
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
 
 export default function MoveHistory() {
-  const [moves, setMoves] = useState([
-    {
-      id: 1,
-      reference: "WH/IN/0001",
-      date: "12/1/2001",
-      contact: "Azure Interior",
-      from: "vendor",
-      to: "Distinct Gull",
-      quantity: 50,
-      status: "Ready",
-    },
-    {
-      id: 2,
-      reference: "WH/OUT/0002",
-      date: "12/1/2001",
-      contact: "Azure Interior",
-      from: "WH/Stock1",
-      to: "vendor",
-      quantity: 30,
-      status: "Ready",
-    },
-    {
-      id: 3,
-      reference: "WH/OUT/0002",
-      date: "12/1/2001",
-      contact: "Azure Interior",
-      from: "WH/Stock2",
-      to: "vendor",
-      quantity: 25,
-      status: "Ready",
-    },
-  ])
+  const socket = useSocket()
+  const [moves, setMoves] = useState([])
+  const [products, setProducts] = useState([])
+  const [warehouses, setWarehouses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState("list")
 
-  const [viewMode, setViewMode] = useState("list") // list or kanban
+  const [filters, setFilters] = useState({
+    product_id: "",
+    warehouse_id: "",
+    type: "",
+    search: "",
+  })
+
+  useEffect(() => {
+    fetchMoveHistory()
+    fetchProducts()
+    fetchWarehouses()
+
+    if (socket) {
+      socket.on("stockUpdated", () => fetchMoveHistory())
+      socket.on("transferCreated", () => fetchMoveHistory())
+      socket.on("receiptValidated", () => fetchMoveHistory())
+      socket.on("deliveryValidated", () => fetchMoveHistory())
+    }
+
+    return () => {
+      if (socket) {
+        socket.off("stockUpdated")
+        socket.off("transferCreated")
+        socket.off("receiptValidated")
+        socket.off("deliveryValidated")
+      }
+    }
+  }, [socket, filters])
+
+  const fetchMoveHistory = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      const params = new URLSearchParams(filters)
+      const response = await fetch(`${API_URL}/api/move-history?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      setMoves(data)
+    } catch (err) {
+      console.error("[v0] Failed to fetch move history:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/products`)
+      const data = await response.json()
+      setProducts(data)
+    } catch (err) {
+      console.error("[v0] Failed to fetch products:", err)
+    }
+  }
+
+  const fetchWarehouses = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/warehouses`)
+      const data = await response.json()
+      setWarehouses(data)
+    } catch (err) {
+      console.error("[v0] Failed to fetch warehouses:", err)
+    }
+  }
+
+  const getMoveIcon = (type) => {
+    if (type === "receipt" || type === "scan_add" || type === "initial_stock") {
+      return <FiTrendingUp className="w-5 h-5 text-green-600" />
+    } else if (type === "delivery" || type === "scan_remove") {
+      return <FiTrendingDown className="w-5 h-5 text-red-600" />
+    } else if (type === "transfer") {
+      return <FiRepeat className="w-5 h-5 text-blue-600" />
+    }
+    return <FiList className="w-5 h-5 text-gray-600" />
+  }
+
+  const getMoveColor = (changeQty) => {
+    if (changeQty > 0) return "text-green-600 font-semibold"
+    if (changeQty < 0) return "text-red-600 font-semibold"
+    return "text-gray-600"
+  }
 
   return (
-    <div className="p-8 mt-16">
+    <div className="p-4 sm:p-6 lg:p-8 pt-20">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-grey-900 mb-2">Move History</h1>
-        <p className="text-grey-600">When user click on Move History</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 text-odoo-dark">Move History / Ledger</h1>
+        <p className="text-sm sm:text-base text-odoo-medium">Complete audit trail of all inventory movements</p>
       </div>
 
-      {/* Controls */}
-      <div className="flex gap-4 mb-6 items-center">
-        <button className="btn-primary">+ NEW</button>
-        <input type="text" placeholder="Search..." className="input-field flex-1" />
-        <button
-          onClick={() => setViewMode("list")}
-          className={`px-4 py-2 rounded ${viewMode === "list" ? "bg-purple-700 text-white" : "bg-grey-200 text-grey-700"}`}
-        >
-          📋 List
-        </button>
-        <button
-          onClick={() => setViewMode("kanban")}
-          className={`px-4 py-2 rounded ${viewMode === "kanban" ? "bg-purple-700 text-white" : "bg-grey-200 text-grey-700"}`}
-        >
-          📊 Kanban
-        </button>
+      {/* Filters */}
+      <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="relative flex-1">
+            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-odoo-medium" />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              placeholder="Search by SKU or product..."
+              className="input-field pl-10 w-full"
+            />
+          </div>
+
+          <select
+            value={filters.product_id}
+            onChange={(e) => setFilters({ ...filters, product_id: e.target.value })}
+            className="input-field w-full"
+          >
+            <option value="">All Products</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.sku})
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filters.warehouse_id}
+            onChange={(e) => setFilters({ ...filters, warehouse_id: e.target.value })}
+            className="input-field w-full"
+          >
+            <option value="">All Warehouses</option>
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filters.type}
+            onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+            className="input-field w-full"
+          >
+            <option value="">All Types</option>
+            <option value="receipt">Receipt</option>
+            <option value="delivery">Delivery</option>
+            <option value="transfer">Transfer</option>
+            <option value="adjustment">Adjustment</option>
+            <option value="scan_add">Scan Add</option>
+            <option value="scan_remove">Scan Remove</option>
+          </select>
+        </div>
+
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={() => setViewMode("list")}
+            className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${
+              viewMode === "list" ? "bg-odoo-purple text-white" : "bg-gray-100 text-gray-600"
+            }`}
+          >
+            <FiList className="w-5 h-5" />
+            <span className="hidden sm:inline">List</span>
+          </button>
+          <button
+            onClick={() => setViewMode("kanban")}
+            className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg flex items-center justify-center gap-2 ${
+              viewMode === "kanban" ? "bg-odoo-purple text-white" : "bg-gray-100 text-gray-600"
+            }`}
+          >
+            <FiGrid className="w-5 h-5" />
+            <span className="hidden sm:inline">Group by Type</span>
+          </button>
+        </div>
       </div>
 
       {/* Table View */}
       {viewMode === "list" && (
-        <div className="card overflow-x-auto">
+        <div className="bg-white rounded-xl shadow-lg overflow-x-auto">
           <table className="w-full">
-            <thead>
-              <tr className="border-b-2 border-purple-700">
-                <th className="text-left py-3 px-4 font-semibold text-purple-700">Reference</th>
-                <th className="text-left py-3 px-4 font-semibold text-purple-700">Date</th>
-                <th className="text-left py-3 px-4 font-semibold text-purple-700">Contact</th>
-                <th className="text-left py-3 px-4 font-semibold text-purple-700">From</th>
-                <th className="text-left py-3 px-4 font-semibold text-purple-700">To</th>
-                <th className="text-left py-3 px-4 font-semibold text-purple-700">Quantity</th>
-                <th className="text-left py-3 px-4 font-semibold text-purple-700">Status</th>
+            <thead className="bg-odoo-purple text-white">
+              <tr>
+                <th className="px-6 py-3 text-left text-sm font-semibold">Date</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold">Product</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold">Type</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold">From</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold">To</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold">Quantity</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold">Reference</th>
+                <th className="px-6 py-3 text-left text-sm font-semibold">User</th>
               </tr>
             </thead>
             <tbody>
-              {moves.map((move) => (
-                <tr key={move.id} className="table-row">
-                  <td className="py-3 px-4 font-mono text-purple-600">{move.reference}</td>
-                  <td className="py-3 px-4 text-grey-600">{move.date}</td>
-                  <td className="py-3 px-4">{move.contact}</td>
-                  <td className="py-3 px-4">{move.from}</td>
-                  <td className="py-3 px-4">{move.to}</td>
-                  <td className="py-3 px-4">{move.quantity}</td>
-                  <td className="py-3 px-4">
-                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">{move.status}</span>
+              {moves.map((move, idx) => (
+                <tr key={move.id} className={idx % 2 === 0 ? "bg-gray-50" : "bg-white"}>
+                  <td className="px-6 py-4 text-sm text-odoo-medium">{new Date(move.created_at).toLocaleString()}</td>
+                  <td className="px-6 py-4">
+                    <div className="font-medium text-odoo-dark">{move.product_name}</div>
+                    <div className="text-xs text-odoo-medium font-mono">{move.sku}</div>
                   </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      {getMoveIcon(move.type)}
+                      <span className="text-sm capitalize">{move.type.replace("_", " ")}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-odoo-medium">{move.from_warehouse_name || "-"}</td>
+                  <td className="px-6 py-4 text-sm text-odoo-medium">{move.to_warehouse_name || "-"}</td>
+                  <td className="px-6 py-4">
+                    <span className={getMoveColor(move.change_qty)}>
+                      {move.change_qty > 0 ? "+" : ""}
+                      {move.change_qty}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-mono text-odoo-purple">{move.ref_no || "-"}</td>
+                  <td className="px-6 py-4 text-sm text-odoo-medium">{move.user_name || "System"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {moves.length === 0 && !loading && (
+            <div className="text-center py-12">
+              <FiList className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-odoo-medium">No move history found</p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Kanban View */}
+      {/* Kanban View - Grouped by Type */}
       {viewMode === "kanban" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {["Draft", "Waiting", "Ready"].map((status) => (
-            <div key={status} className="bg-white rounded-lg border border-grey-200 p-4">
-              <h3 className="font-semibold text-grey-900 mb-4">{status}</h3>
-              <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {["receipt", "delivery", "transfer", "adjustment", "scan_add", "scan_remove"].map((type) => (
+            <div key={type} className="bg-white rounded-xl shadow-lg p-4">
+              <h3 className="font-semibold text-odoo-dark mb-4 flex items-center gap-2 capitalize">
+                {getMoveIcon(type)}
+                {type.replace("_", " ")}
+                <span className="ml-auto text-sm text-odoo-medium">
+                  ({moves.filter((m) => m.type === type).length})
+                </span>
+              </h3>
+              <div className="space-y-3 max-h-96 overflow-y-auto">
                 {moves
-                  .filter((m) => m.status === status)
+                  .filter((m) => m.type === type)
                   .map((move) => (
-                    <div key={move.id} className="bg-grey-50 p-3 rounded border border-grey-200">
-                      <p className="font-mono text-sm text-purple-600 mb-1">{move.reference}</p>
-                      <p className="text-sm text-grey-600">{move.contact}</p>
+                    <div
+                      key={move.id}
+                      className="bg-odoo-lavender p-3 rounded-lg border border-odoo-purple border-opacity-20"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <p className="font-mono text-sm text-odoo-purple">{move.ref_no || "N/A"}</p>
+                        <span className={`text-sm font-semibold ${getMoveColor(move.change_qty)}`}>
+                          {move.change_qty > 0 ? "+" : ""}
+                          {move.change_qty}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-odoo-dark">{move.product_name}</p>
+                      <p className="text-xs text-odoo-medium mt-1">{move.sku}</p>
+                      <div className="flex justify-between items-center mt-2 text-xs text-odoo-medium">
+                        <span>{move.to_warehouse_name || move.from_warehouse_name || "-"}</span>
+                        <span>{new Date(move.created_at).toLocaleDateString()}</span>
+                      </div>
                     </div>
                   ))}
+                {moves.filter((m) => m.type === type).length === 0 && (
+                  <p className="text-sm text-odoo-medium text-center py-4">No movements</p>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      <p className="text-grey-600 mt-6 text-sm">
-        Populate all moves done between the from - To location in inventory
-        <br />
-        In event should be display in green. Out moves should be display in red
-      </p>
+      {loading && (
+        <div className="text-center py-12">
+          <div className="text-odoo-medium">Loading move history...</div>
+        </div>
+      )}
     </div>
   )
 }

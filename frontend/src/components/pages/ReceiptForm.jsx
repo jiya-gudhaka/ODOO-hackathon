@@ -176,57 +176,64 @@ export default function ReceiptForm({ setCurrentPage, receiptId = null }) {
   }
 
   return (
-    <div className="p-8 mt-16">
+    <div className="p-4 sm:p-6 lg:p-8 pt-20">
       {/* Header */}
-      <div className="mb-8 flex justify-between items-center">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: "#714B67" }}>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2" style={{ color: "#714B67" }}>
             Receipt
           </h1>
-          <p style={{ color: "#8F8F9F" }}>When user click on receipt operations - By default land on List View</p>
+          <p className="text-sm sm:text-base" style={{ color: "#8F8F9F" }}>
+            When user click on receipt operations - By default land on List View
+          </p>
         </div>
         <button
           onClick={() => setCurrentPage("receipts")}
-          className="flex items-center gap-2 transition-colors"
+          className="flex items-center gap-2 transition-colors text-sm sm:text-base"
           style={{ color: "#714B67" }}
         >
-          <FiArrowLeft className="w-5 h-5" />
-          Back to List
+          <FiArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+          <span>Back to List</span>
         </button>
       </div>
 
-      <div className="flex gap-4 mb-6">
-        <button onClick={() => setCurrentPage("receipts")} className="btn-secondary flex items-center gap-2">
-          <FiPlus className="w-4 h-4" />
-          New
+      <div className="flex flex-wrap gap-2 sm:gap-4 mb-6">
+        <button
+          onClick={() => setCurrentPage("receipts")}
+          className="btn-secondary flex items-center gap-2 text-sm sm:text-base"
+        >
+          <FiPlus className="w-4 h-4 flex-shrink-0" />
+          <span>New</span>
         </button>
         <button
           onClick={handleValidate}
           disabled={receipt.status !== "Draft"}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm sm:text-base"
         >
-          <FiCheck className="w-4 h-4" />
-          Validate
+          <FiCheck className="w-4 h-4 flex-shrink-0" />
+          <span>Validate</span>
         </button>
         <button
           onClick={handlePrint}
           disabled={receipt.status !== "Done"}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm sm:text-base"
         >
-          <FiPrinter className="w-4 h-4" />
-          Print
+          <FiPrinter className="w-4 h-4 flex-shrink-0" />
+          <span>Print</span>
         </button>
-        <button onClick={handleCancel} className="btn-secondary flex items-center gap-2">
-          <FiX className="w-4 h-4" />
-          Cancel
+        <button onClick={handleCancel} className="btn-secondary flex items-center gap-2 text-sm sm:text-base">
+          <FiX className="w-4 h-4 flex-shrink-0" />
+          <span>Cancel</span>
         </button>
 
         {/* Status Indicator */}
-        <div className="ml-auto flex items-center gap-4">
-          <div className="text-sm" style={{ color: "#8F8F9F" }}>
+        <div className="w-full sm:w-auto sm:ml-auto flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+          <div className="text-xs sm:text-sm" style={{ color: "#8F8F9F" }}>
             <span className="font-semibold">Status Flow:</span> Draft → Ready → Done
           </div>
-          <span className={`px-4 py-2 rounded-full font-semibold ${getStatusColor(receipt.status)}`}>
+          <span
+            className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-sm font-semibold ${getStatusColor(receipt.status)}`}
+          >
             {receipt.status}
           </span>
         </div>
@@ -235,17 +242,16 @@ export default function ReceiptForm({ setCurrentPage, receiptId = null }) {
       {/* Receipt Form */}
       <div className="card mb-6">
         {/* Reference */}
-        <div className="mb-6 p-6 rounded-lg" style={{ backgroundColor: "#E4D8F5" }}>
-          <h2 className="text-2xl font-bold font-mono" style={{ color: "#714B67" }}>
+        <div className="mb-6 p-4 sm:p-6 rounded-lg" style={{ backgroundColor: "#E4D8F5" }}>
+          <h2 className="text-xl sm:text-2xl font-bold font-mono break-all" style={{ color: "#714B67" }}>
             {receipt.reference}
           </h2>
-          <p className="text-sm mt-1" style={{ color: "#8F8F9F" }}>
+          <p className="text-xs sm:text-sm mt-1" style={{ color: "#8F8F9F" }}>
             Reference auto-generated
           </p>
         </div>
 
-        {/* Form Fields */}
-        <div className="grid grid-cols-2 gap-6 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-6">
           <div>
             <label className="block text-sm font-semibold mb-2" style={{ color: "#4A4A4A" }}>
               Receive From
@@ -292,13 +298,15 @@ export default function ReceiptForm({ setCurrentPage, receiptId = null }) {
       {/* Products Section */}
       <div className="card">
         <div className="border-b-2 p-4" style={{ borderColor: "#714B67" }}>
-          <h3 className="text-xl font-bold" style={{ color: "#714B67" }}>
+          <h3 className="text-lg sm:text-xl font-bold" style={{ color: "#714B67" }}>
             Products
           </h3>
         </div>
 
-        {/* Add Product */}
-        <div className="p-6 flex gap-4 items-end" style={{ backgroundColor: "#E5E5E7" }}>
+        <div
+          className="p-4 sm:p-6 flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-end"
+          style={{ backgroundColor: "#E5E5E7" }}
+        >
           <div className="flex-1">
             <label className="block text-sm font-semibold mb-2" style={{ color: "#4A4A4A" }}>
               Select Product
@@ -317,7 +325,7 @@ export default function ReceiptForm({ setCurrentPage, receiptId = null }) {
             </select>
           </div>
 
-          <div className="w-32">
+          <div className="w-full sm:w-32">
             <label className="block text-sm font-semibold mb-2" style={{ color: "#4A4A4A" }}>
               Quantity
             </label>
@@ -331,67 +339,72 @@ export default function ReceiptForm({ setCurrentPage, receiptId = null }) {
             />
           </div>
 
-          <button onClick={addProduct} className="btn-primary flex items-center gap-2">
-            <FiPlus className="w-5 h-5" />
-            Add Product
+          <button
+            onClick={addProduct}
+            className="btn-primary flex items-center justify-center gap-2 text-sm sm:text-base"
+          >
+            <FiPlus className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span>Add Product</span>
           </button>
         </div>
 
         {/* Products Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr style={{ borderBottom: "1px solid #E5E5E7" }}>
-                <th className="text-left py-3 px-4 font-semibold" style={{ color: "#4A4A4A" }}>
-                  Product
-                </th>
-                <th className="text-left py-3 px-4 font-semibold" style={{ color: "#4A4A4A" }}>
-                  SKU
-                </th>
-                <th className="text-right py-3 px-4 font-semibold" style={{ color: "#4A4A4A" }}>
-                  Quantity
-                </th>
-                <th className="text-center py-3 px-4 font-semibold" style={{ color: "#4A4A4A" }}>
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {receipt.products.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="text-center py-8" style={{ color: "#8F8F9F" }}>
-                    No products added yet. Add products above.
-                  </td>
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="min-w-[600px]">
+            <table className="w-full">
+              <thead>
+                <tr style={{ borderBottom: "1px solid #E5E5E7" }}>
+                  <th className="text-left py-3 px-3 sm:px-4 font-semibold text-sm" style={{ color: "#4A4A4A" }}>
+                    Product
+                  </th>
+                  <th className="text-left py-3 px-3 sm:px-4 font-semibold text-sm" style={{ color: "#4A4A4A" }}>
+                    SKU
+                  </th>
+                  <th className="text-right py-3 px-3 sm:px-4 font-semibold text-sm" style={{ color: "#4A4A4A" }}>
+                    Quantity
+                  </th>
+                  <th className="text-center py-3 px-3 sm:px-4 font-semibold text-sm" style={{ color: "#4A4A4A" }}>
+                    Action
+                  </th>
                 </tr>
-              ) : (
-                receipt.products.map((product, index) => (
-                  <tr key={index} className="hover:bg-gray-50" style={{ borderBottom: "1px solid #E5E5E7" }}>
-                    <td className="py-3 px-4" style={{ color: "#4A4A4A" }}>
-                      {product.name}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-sm" style={{ color: "#8F8F9F" }}>
-                      [{product.sku}]
-                    </td>
-                    <td className="py-3 px-4 text-right font-semibold" style={{ color: "#4A4A4A" }}>
-                      {product.quantity}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <button
-                        onClick={() => removeProduct(index)}
-                        className="inline-flex items-center gap-1 text-sm font-semibold text-red-600 hover:text-red-700 transition-colors"
-                      >
-                        <FiTrash2 className="w-4 h-4" />
-                        Remove
-                      </button>
+              </thead>
+              <tbody>
+                {receipt.products.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="text-center py-8 text-sm" style={{ color: "#8F8F9F" }}>
+                      No products added yet. Add products above.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  receipt.products.map((product, index) => (
+                    <tr key={index} className="hover:bg-gray-50" style={{ borderBottom: "1px solid #E5E5E7" }}>
+                      <td className="py-3 px-3 sm:px-4 text-sm" style={{ color: "#4A4A4A" }}>
+                        {product.name}
+                      </td>
+                      <td className="py-3 px-3 sm:px-4 font-mono text-xs sm:text-sm" style={{ color: "#8F8F9F" }}>
+                        [{product.sku}]
+                      </td>
+                      <td className="py-3 px-3 sm:px-4 text-right font-semibold text-sm" style={{ color: "#4A4A4A" }}>
+                        {product.quantity}
+                      </td>
+                      <td className="py-3 px-3 sm:px-4 text-center">
+                        <button
+                          onClick={() => removeProduct(index)}
+                          className="inline-flex items-center gap-1 text-xs sm:text-sm font-semibold text-red-600 hover:text-red-700 transition-colors"
+                        >
+                          <FiTrash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
+                          <span>Remove</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div className="p-4 text-sm" style={{ backgroundColor: "#E5E5E7", color: "#8F8F9F" }}>
+        <div className="p-4 text-xs sm:text-sm" style={{ backgroundColor: "#E5E5E7", color: "#8F8F9F" }}>
           <p>Auto fill with the current logged in users.</p>
           <p className="mt-1">On click, TODO, move to Ready</p>
           <p className="mt-1">on click, Validate move to Done</p>
@@ -401,9 +414,12 @@ export default function ReceiptForm({ setCurrentPage, receiptId = null }) {
       {/* Action Button at Bottom */}
       {receipt.status === "Ready" && (
         <div className="mt-6 flex justify-end">
-          <button onClick={handleDone} className="btn-primary text-lg px-8 py-3 flex items-center gap-2">
-            <FiCheck className="w-5 h-5" />
-            Mark as Done
+          <button
+            onClick={handleDone}
+            className="btn-primary text-base sm:text-lg px-6 sm:px-8 py-2.5 sm:py-3 flex items-center gap-2"
+          >
+            <FiCheck className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span>Mark as Done</span>
           </button>
         </div>
       )}
@@ -413,10 +429,10 @@ export default function ReceiptForm({ setCurrentPage, receiptId = null }) {
         className="mt-6 p-4 rounded-lg"
         style={{ backgroundColor: "#E4D8F5", borderColor: "#714B67", border: "1px solid" }}
       >
-        <h4 className="font-semibold mb-2" style={{ color: "#714B67" }}>
+        <h4 className="font-semibold mb-2 text-sm sm:text-base" style={{ color: "#714B67" }}>
           Status Workflow Guide:
         </h4>
-        <ul className="text-sm space-y-1" style={{ color: "#4A4A4A" }}>
+        <ul className="text-xs sm:text-sm space-y-1" style={{ color: "#4A4A4A" }}>
           <li>
             <strong>Draft:</strong> Initial state - Add products and fill details
           </li>

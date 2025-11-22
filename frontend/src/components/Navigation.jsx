@@ -77,6 +77,9 @@ export default function Navigation({ currentPage, setCurrentPage, userInfo, onLo
                 <button
                   onClick={() => {
                     if (item.submenu) {
+                      if (!sidebarOpen) {
+                        setSidebarOpen(true)
+                      }
                       setDropdownOpen(dropdownOpen === item.id ? null : item.id)
                     } else {
                       setCurrentPage(item.id)
@@ -89,12 +92,13 @@ export default function Navigation({ currentPage, setCurrentPage, userInfo, onLo
                     backgroundColor: currentPage === item.id ? "#E4D8F5" : "transparent",
                     color: currentPage === item.id ? "#714B67" : "#4A4A4A",
                   }}
+                  title={!sidebarOpen ? item.label : ""}
                 >
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   {sidebarOpen && <span className="text-sm">{item.label}</span>}
                   {item.submenu && sidebarOpen && (
                     <FiChevronDown
-                      className={`ml-auto w-4 h-4 transition-transform ${dropdownOpen === item.id ? "rotate-180" : ""}`}
+                      className={`ml-auto w-4 h-4 transition-transform flex-shrink-0 ${dropdownOpen === item.id ? "rotate-180" : ""}`}
                     />
                   )}
                 </button>
@@ -116,7 +120,7 @@ export default function Navigation({ currentPage, setCurrentPage, userInfo, onLo
                             color: currentPage === setting.id ? "#714B67" : "#8F8F9F",
                           }}
                         >
-                          <SettingIcon className="w-4 h-4" />
+                          <SettingIcon className="w-4 h-4 flex-shrink-0" />
                           {setting.label}
                         </button>
                       )
@@ -136,7 +140,7 @@ export default function Navigation({ currentPage, setCurrentPage, userInfo, onLo
               className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 hover:bg-red-50"
               style={{ color: "#DC2626" }}
             >
-              <FiLogOut className="w-5 h-5" />
+              <FiLogOut className="w-5 h-5 flex-shrink-0" />
               <span className="text-sm font-medium">Logout</span>
             </button>
           </div>
